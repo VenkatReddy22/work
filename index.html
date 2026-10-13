@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hours log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fbfbf9; --fg:#1d1d1b; --muted:#6c6c66; --line:#e4e4de; --field:#ffffff;
+  --accent:#2f4f86; --accent-fg:#ffffff; --danger:#a33a2f; --bar:#c9d4ea;
+  --sans:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Instrument Serif",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#161615; --fg:#ecece8; --muted:#9a9a93; --line:#2b2b28; --field:#1e1e1c; --accent:#8fb0e8; --accent-fg:#101418; --danger:#e08a80; --bar:#34425e;}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--sans);font-variant-numeric:tabular-nums}
+main{max-width:660px;margin:0 auto;padding:48px 20px 96px}
+h1{font:400 clamp(34px,8vw,48px)/1.05 var(--serif);margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 24px}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 0;margin-bottom:-1px;color:var(--muted);background:none}
+.tabs button.on{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+form{display:grid;grid-template-columns:1fr 1fr;gap:14px 12px}
+.full{grid-column:1/-1}
+label{display:block;font-size:14px;color:var(--muted);margin-bottom:4px}
+input,textarea,select{width:100%;font:inherit;color:var(--fg);background:var(--field);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+textarea{resize:vertical;min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--fg);padding:9px 14px}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600;padding:11px 16px}
+button.link{border:0;padding:4px 6px;color:var(--muted);font-size:14px}
+button.link:hover{color:var(--fg)}
+button.danger:hover{color:var(--danger)}
+.preview{color:var(--muted);font-size:14px;min-height:21px;margin-top:-4px}
+.btnrow{display:flex;gap:8px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-top:40px;padding-top:20px;border-top:1px solid var(--line)}
+.filters>div{flex:1 1 150px}
+.sumline{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--muted);font-size:14px;margin-top:12px}
+.notice{border:1px dashed var(--line);border-radius:6px;padding:12px 14px;color:var(--muted);font-size:14px;margin:24px 0 0}
+section.period{margin-top:40px}
+.phead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:4px}
+.phead h2{font:400 26px/1.1 var(--serif);margin:0}
+.phead .tot{color:var(--muted);font-size:14px;white-space:nowrap}
+.phead .tot b{color:var(--fg);font-weight:600}
+.week{margin-top:22px}
+.whead{color:var(--muted);font-size:14px}
+.entry{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line)}
+.entry p{margin:0;overflow-wrap:anywhere;white-space:pre-line}
+.entry .acts{display:flex;flex-shrink:0}
+.wtotal{display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;font-weight:600}
+.ptotal{margin-top:26px;padding-top:12px;border-top:1px solid var(--line);font-size:17px}
+.figs{display:grid;grid-template-columns:1fr 1fr;gap:22px 16px}
+.fig .v{display:block;font:400 34px/1.1 var(--serif)}
+.fig .l{color:var(--muted);font-size:14px}
+.chart{margin-top:40px}
+.chart h3{font:400 24px/1.1 var(--serif);margin:0 0 10px}
+.bar{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;padding:4px 0;font-size:14px}
+.bar .bl{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .bt{height:14px;background:transparent}
+.bar .bt i{display:block;height:100%;background:var(--bar);border-radius:3px;min-width:2px}
+.bar .bv{text-align:right}
+details{margin-top:56px;border-top:1px solid var(--line);padding-top:16px}
+summary{cursor:pointer;color:var(--muted)}
+.settings{display:grid;gap:16px;margin-top:16px}
+.hint{font-size:13px;color:var(--muted);margin:4px 0 0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:6px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="today"></h1>
+  <p class="sub" id="periodNow"></p>
+
+  <nav class="tabs" aria-label="Views">
+    <button type="button" data-tab="notes" class="on">Notes</button>
+    <button type="button" data-tab="stats">Stats</button>
+  </nav>
+
+  <form id="form" autocomplete="off">
+    <div class="full">
+      <label for="date">Date</label>
+      <input type="date" id="date" required>
+    </div>
+    <div>
+      <label for="start">Start</label>
+      <input type="time" id="start" required>
+    </div>
+    <div>
+      <label for="end">End</label>
+      <input type="time" id="end" required>
+    </div>
+    <div>
+      <label for="partner">Partner</label>
+      <input type="text" id="partner" list="partners" placeholder="Who you worked with" required>
+      <datalist id="partners"></datalist>
+    </div>
+    <div>
+      <label for="brk">Unpaid break (min)</label>
+      <input type="number" id="brk" min="0" step="5" value="0" inputmode="numeric">
+    </div>
+    <div class="full preview" id="preview"></div>
+    <div class="full btnrow">
+      <button class="primary" type="submit" id="saveBtn">Save entry</button>
+      <button type="button" id="cancelEdit" hidden>Cancel edit</button>
+    </div>
+  </form>
+
+  <div class="filters">
+    <div>
+      <label for="range">Show</label>
+      <select id="range">
+        <option value="all">All employment</option>
+        <option value="ytd">Year to date</option>
+        <option value="thisPeriod">This biweekly</option>
+        <option value="lastPeriod">Last biweekly</option>
+        <option value="thisMonth">This month</option>
+        <option value="lastMonth">Last month</option>
+        <option value="last30">Last 30 days</option>
+        <option value="custom">Custom range</option>
+      </select>
+    </div>
+    <div>
+      <label for="partnerFilter">Partner</label>
+      <select id="partnerFilter"></select>
+    </div>
+    <div id="customWrap" class="full" style="flex-basis:100%" hidden>
+      <div class="row">
+        <div style="flex:1 1 140px"><label for="from">From</label><input type="date" id="from"></div>
+        <div style="flex:1 1 140px"><label for="to">To</label><input type="date" id="to"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notesView">
+    <div class="sumline"><span id="sumText"></span><button type="button" class="link" id="dlAll">Download all notes (.txt)</button></div>
+    <div id="list"></div>
+  </div>
+  <div id="statsView" hidden></div>
+
+  <details>
+    <summary>Settings and backup</summary>
+    <div class="settings">
+      <div>
+        <label for="anchor">A biweekly start date</label>
+        <input type="date" id="anchor">
+        <p class="hint">Any biweekly start works. Every 14 days after it starts a new one, and weeks run Monday to Sunday from it.</p>
+      </div>
+      <div>
+        <label for="hire">First day of work</label>
+        <input type="date" id="hire">
+        <p class="hint">Shifts before your first full biweekly (like training) are counted in Biweekly 1.</p>
+      </div>
+      <div>
+        <label for="template">Note format</label>
+        <textarea id="template" spellcheck="false"></textarea>
+        <p class="hint">Fill-ins: {day} {date} {iso} {start} {end} {partner} {hours} {break}. Press Enter for a new line.</p>
+        <div class="row" style="margin-top:8px"><button type="button" id="resetTpl">Reset to default</button></div>
+      </div>
+      <div>
+        <label>Backup</label>
+        <div class="row">
+          <button type="button" id="export">Download backup</button>
+          <button type="button" id="importBtn">Restore from backup</button>
+          <input type="file" id="importFile" accept="application/json" hidden>
+        </div>
+        <p class="hint">Entries are saved in this browser on this device. Download a backup now and then.</p>
+      </div>
+    </div>
+  </details>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var KEY = "hours-log-v2", OLD_KEY = "hours-log-v1";
+  var DEFAULT_ANCHOR = "2026-10-05", DEFAULT_HIRE = "2026-09-03";
+  var DEFAULT_TPL = "{day}- {date},\n{start} to {end}.- with {partner}";
+
+  // Shifts loaded the first time the page opens: [date, start, end, partner]
+  var SEED = [
+    ["2026-09-03","09:00","19:09","Paul and Kevin"],
+    ["2026-09-04","08:00","17:00","Sammy"],
+    ["2026-09-06","13:56","02:30","Nithin"],
+    ["2026-09-07","20:58","04:30","Nithin"],
+    ["2026-09-09","10:00","20:00","Parvesh"],
+    ["2026-09-10","07:50","13:30","Munish"],
+    ["2026-09-15","06:00","19:00","Sammy"],
+    ["2026-09-16","06:00","16:30","Sammy"],
+    ["2026-09-17","05:00","17:00","Sammy"],
+    ["2026-09-18","06:00","18:00","Sammy"],
+    ["2026-09-21","06:00","17:00","Sammy"],
+    ["2026-09-23","06:00","17:05","Sammy"],
+    ["2026-09-25","06:00","18:20","Sammy"],
+    ["2026-09-29","08:00","17:10","Athar"],
+    ["2026-09-30","07:34","17:30","Athar"],
+    ["2026-10-01","06:02","17:24","Athar"],
+    ["2026-10-02","06:00","16:00","Sammy"],
+    ["2026-10-03","17:30","05:40","Nithin"],
+    ["2026-10-05","06:00","14:00","Sammy"],
+    ["2026-10-07","04:00","17:31","Sammy"],
+    ["2026-10-09","04:30","18:30","Sammy"],
+    ["2026-10-10","07:00","15:40","Athar"],
+    ["2026-10-12","10:00","16:00","Maaz"]
+  ];
+
+  var state = { entries: [], anchor: DEFAULT_ANCHOR, hire: DEFAULT_HIRE, template: DEFAULT_TPL, seeded: false };
+  var ui = { tab: "notes", range: "all", partner: "", from: "", to: "", editing: null };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var MS_DAY = 86400000;
+
+  function load(){
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        state.entries = s.entries || []; state.anchor = s.anchor || DEFAULT_ANCHOR;
+        state.hire = s.hire || DEFAULT_HIRE; state.template = s.template || DEFAULT_TPL; state.seeded = !!s.seeded;
+      } else {
+        var old = localStorage.getItem(OLD_KEY);
+        if (old) state.entries = JSON.parse(old).entries || [];
+      }
+    } catch(e) {}
+    if (!state.seeded) {
+      SEED.forEach(function(r){
+        var dup = state.entries.some(function(e){ return e.date === r[0] && e.start === r[1]; });
+        if (!dup) state.entries.push({ id: "s" + r[0] + r[1].replace(":", ""), date: r[0], start: r[1], end: r[2], brk: 0, partner: r[3] });
+      });
+      state.seeded = true; save();
+    }
+  }
+  function save(){
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch(e) { toast("Could not save in this browser. Check privacy settings."); }
+  }
+
+  // dates and times
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+  function isoLocal(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+  function parseISO(s){ var p = s.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
+  function dayNum(s){ var p = s.split("-").map(Number); return Math.round(Date.UTC(p[0], p[1]-1, p[2]) / MS_DAY); }
+  function addDays(s, n){ var d = parseISO(s); d.setDate(d.getDate() + n); return isoLocal(d); }
+  function longDay(s){ return parseISO(s).toLocaleDateString("en-CA", { weekday: "long" }); }
+  function shortDate(s, withYear){
+    return parseISO(s).toLocaleDateString("en-CA", withYear ? { month: "short", day: "numeric", year: "numeric" } : { month: "short", day: "numeric" });
+  }
+  function ordDate(s){
+    var d = parseISO(s), n = d.getDate(), v = n % 100;
+    var suf = (v >= 11 && v <= 13) ? "th" : ({1:"st",2:"nd",3:"rd"}[n % 10] || "th");
+    return d.toLocaleDateString("en-CA", { month: "long" }) + " " + n + suf;
+  }
+  function time12(t){
+    var p = t.split(":").map(Number), h = p[0], m = p[1];
+    var ap = h >= 12 ? "pm" : "am"; h = h % 12; if (h === 0) h = 12;
+    return h + ":" + pad(m) + " " + ap;
+  }
+  function minutesWorked(start, end, brk){
+    var a = start.split(":").map(Number), b = end.split(":").map(Number);
+    var mins = (b[0]*60 + b[1]) - (a[0]*60 + a[1]);
+    if (mins <= 0) mins += 1440; // shift past midnight
+    return Math.max(0, mins - (Number(brk) || 0));
+  }
+  function hoursStr(mins){ return (Math.round(mins / 60 * 100) / 100).toString(); }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function tidy(n){
+    return n.trim().replace(/\s+/g, " ").toLowerCase().replace(/\b[a-z]/g, function(c){ return c.toUpperCase(); }).replace(/\bAnd\b/g, "and");
+  }
+  function partnersOf(e){
+    return e.partner.split(/\s*(?:,|&|\+|\/|\band\b)\s*/i).map(tidy).filter(Boolean);
+  }
+  function sortAsc(a, b){ return a.date === b.date ? (a.start < b.start ? -1 : 1) : (a.date < b.date ? -1 : 1); }
+
+  // biweekly periods and weeks
+  function rawPeriodStart(ds){
+    var diff = dayNum(ds) - dayNum(state.anchor);
+    return addDays(state.anchor, Math.floor(diff / 14) * 14);
+  }
+  function firstPeriod(){
+    var h = state.hire || DEFAULT_HIRE, ps = rawPeriodStart(h);
+    return ps < h ? addDays(ps, 14) : ps;
+  }
+  function periodStart(ds){
+    var ps = rawPeriodStart(ds), f = firstPeriod();
+    return ps < f ? f : ps;
+  }
+  function periodNo(ps){ return Math.floor((dayNum(ps) - dayNum(firstPeriod())) / 14) + 1; }
+  function periodLabelStart(ps){ var f = firstPeriod(); return (ps === f && state.hire < f) ? state.hire : ps; }
+  function weekStart(ds){
+    var diff = dayNum(ds) - dayNum(state.anchor);
+    return addDays(state.anchor, Math.floor(diff / 7) * 7);
+  }
+  function periodTitle(p){
+    return "Biweekly " + periodNo(p.start) + ": " + shortDate(periodLabelStart(p.start)) + " to " + shortDate(addDays(p.start, 13), true);
+  }
+
+  // note text
+  function format(e){
+    var mins = minutesWorked(e.start, e.end, e.brk);
+    var map = {
+      day: longDay(e.date), date: ordDate(e.date), iso: e.date,
+      start: time12(e.start), end: time12(e.end), partner: e.partner,
+      hours: hoursStr(mins), "break": String(e.brk || 0)
+    };
+    return state.template.replace(/\{(\w+)\}/g, function(m, k){ return k in map ? map[k] : m; });
+  }
+  function weekText(w){ return w.items.map(format).join("\n\n") + "\n\nweekly total hours - " + hoursStr(w.mins); }
+  function periodText(p){
+    return periodTitle(p) + "\n\n" + p.wk.map(weekText).join("\n\n") + "\n\nbiweekly total hours - " + hoursStr(p.mins);
+  }
+
+  function group(entries){
+    var map = {}, out = [];
+    entries.forEach(function(e){
+      var ps = periodStart(e.date), ws = weekStart(e.date), m = minutesWorked(e.start, e.end, e.brk);
+      var p = map[ps]; if (!p) { p = map[ps] = { start: ps, wkMap: {}, wk: [], mins: 0, n: 0 }; out.push(p); }
+      var w = p.wkMap[ws]; if (!w) { w = p.wkMap[ws] = { start: ws, items: [], mins: 0 }; p.wk.push(w); }
+      w.items.push(e); w.mins += m; p.mins += m; p.n++;
+    });
+    out.sort(function(a, b){ return a.start < b.start ? -1 : 1; });
+    out.forEach(function(p){ p.wk.sort(function(a, b){ return a.start < b.start ? -1 : 1; }); });
+    return out;
+  }
+
+  // filters
+  function rangeBounds(){
+    var t = isoLocal(new Date()), r = ui.range, d = parseISO(t), y = d.getFullYear(), m = d.getMonth();
+    if (r === "all") return null;
+    if (r === "ytd") return [y + "-01-01", t];
+    if (r === "thisPeriod") { var p = periodStart(t); return [p, addDays(p, 13)]; }
+    if (r === "lastPeriod") { var q = addDays(periodStart(t), -14); return [q, addDays(q, 13)]; }
+    if (r === "thisMonth") return [isoLocal(new Date(y, m, 1)), isoLocal(new Date(y, m + 1, 0))];
+    if (r === "lastMonth") return [isoLocal(new Date(y, m - 1, 1)), isoLocal(new Date(y, m, 0))];
+    if (r === "last30") return [addDays(t, -29), t];
+    return [ui.from || "0000-01-01", ui.to || "9999-12-31"];
+  }
+  function filtered(){
+    var b = rangeBounds();
+    return state.entries.filter(function(e){
+      if (b && (e.date < b[0] || e.date > b[1])) return false;
+      if (ui.partner && partnersOf(e).indexOf(ui.partner) < 0) return false;
+      return true;
+    }).sort(sortAsc);
+  }
+
+  // helpers
+  function toast(msg){
+    var t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2200);
+  }
+  function copy(text){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){ toast("Copied"); }, fallback);
+    } else fallback();
+    function fallback(){
+      var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); toast("Copied"); } catch(e) { toast("Copy failed"); }
+      document.body.removeChild(ta);
+    }
+  }
+  function download(name, text, type){
+    var b = new Blob([text], { type: type || "text/plain;charset=utf-8" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function btn(label, cls, fn){
+    var b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = label; b.onclick = fn; return b;
+  }
+
+  // rendering
+  function renderHeader(){
+    var today = isoLocal(new Date());
+    $("today").textContent = longDay(today) + ", " + shortDate(today, true);
+    var ps = periodStart(today), pe = addDays(ps, 13), mins = 0;
+    state.entries.forEach(function(e){ if (e.date >= ps && e.date <= pe) mins += minutesWorked(e.start, e.end, e.brk); });
+    $("periodNow").textContent = "Biweekly " + periodNo(ps) + ": " + shortDate(ps) + " to " + shortDate(pe, true) + ", " + hoursStr(mins) + " hrs so far";
+  }
+
+  function renderPartners(){
+    var seen = {}, html = "", tok = {};
+    state.entries.forEach(function(e){
+      var k = e.partner.trim(); if (k && !seen[k]) { seen[k] = 1; html += '<option value="' + esc(k) + '">'; }
+      partnersOf(e).forEach(function(n){ tok[n] = 1; });
+    });
+    $("partners").innerHTML = html;
+    var sel = $("partnerFilter"), names = Object.keys(tok).sort();
+    sel.innerHTML = '<option value="">All partners</option>' + names.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join("");
+    if (names.indexOf(ui.partner) < 0) ui.partner = "";
+    sel.value = ui.partner;
+  }
+
+  function renderList(){
+    var list = $("list"); list.innerHTML = "";
+    var es = filtered(), groups = group(es), total = 0;
+    es.forEach(function(e){ total += minutesWorked(e.start, e.end, e.brk); });
+    $("sumText").textContent = es.length
+      ? es.length + (es.length === 1 ? " shift, " : " shifts, ") + hoursStr(total) + " hrs" + (ui.partner ? " with " + ui.partner : "")
+      : "";
+    $("dlAll").hidden = !es.length;
+    if (!es.length) {
+      list.innerHTML = '<div class="notice">' + (state.entries.length ? "No shifts match this filter." : "No entries yet. Add your first shift above.") + '</div>';
+      return;
+    }
+    groups.slice().reverse().forEach(function(p){
+      var sec = document.createElement("section"); sec.className = "period";
+      var head = document.createElement("div"); head.className = "phead";
+      head.innerHTML = '<h2></h2><span class="tot"><b>' + hoursStr(p.mins) + '</b> hrs</span>';
+      head.querySelector("h2").textContent = periodTitle(p);
+      sec.appendChild(head);
+
+      p.wk.forEach(function(w){
+        var wk = document.createElement("div"); wk.className = "week";
+        var wh = document.createElement("div"); wh.className = "whead";
+        wh.textContent = "Week of " + shortDate(w.start) + " to " + shortDate(addDays(w.start, 6));
+        wk.appendChild(wh);
+        w.items.forEach(function(e){
+          var row = document.createElement("div"); row.className = "entry";
+          var t = document.createElement("p"); t.textContent = format(e);
+          var acts = document.createElement("div"); acts.className = "acts";
+          acts.appendChild(btn("Copy", "link", function(){ copy(format(e)); }));
+          acts.appendChild(btn("Edit", "link", function(){ startEdit(e); }));
+          acts.appendChild(btn("Delete", "link danger", function(){
+            if (confirm("Delete this entry?")) { state.entries = state.entries.filter(function(x){ return x.id !== e.id; }); save(); renderAll(); }
+          }));
+          row.appendChild(t); row.appendChild(acts); wk.appendChild(row);
+        });
+        var tot = document.createElement("div"); tot.className = "wtotal";
+        var tt = document.createElement("span"); tt.textContent = "weekly total hours - " + hoursStr(w.mins);
+        tot.appendChild(tt);
+        tot.appendChild(btn("Copy week", "link", function(){ copy(weekText(w)); }));
+        wk.appendChild(tot);
+        sec.appendChild(wk);
+      });
+
+      var ptot = document.createElement("div"); ptot.className = "wtotal ptotal";
+      var pt = document.createElement("span"); pt.textContent = "biweekly total hours - " + hoursStr(p.mins);
+      ptot.appendChild(pt);
+      var acts2 = document.createElement("span");
+      acts2.appendChild(btn("Copy", "link", function(){ copy(periodText(p)); }));
+      acts2.appendChild(btn("Download .txt", "link", function(){
+        download("biweekly-" + periodNo(p.start) + "_" + p.start + "_to_" + addDays(p.start, 13) + ".txt", periodText(p) + "\n");
+      }));
+      ptot.appendChild(acts2);
+      sec.appendChild(ptot);
+      list.appendChild(sec);
+    });
+  }
+
+  function bars(title, rows, hint){
+    var max = 0; rows.forEach(function(r){ if (r.v > max) max = r.v; });
+    var h = '<div class="chart"><h3>' + esc(title) + '</h3>';
+    rows.forEach(function(r){
+      h += '<div class="bar"><span class="bl" title="' + esc(r.l) + '">' + esc(r.l) + '</span><span class="bt"><i style="width:' + (max ? Math.round(r.v / max * 100) : 0) + '%"></i></span><span class="bv">' + esc(r.t) + '</span></div>';
+    });
+    if (hint) h += '<p class="hint">' + esc(hint) + '</p>';
+    return h + '</div>';
+  }
+
+  function renderStats(){
+    var el = $("statsView"), es = filtered();
+    if (!es.length) { el.innerHTML = '<div class="notice">No shifts match this filter.</div>'; return; }
+    var groups = group(es), total = 0, longest = { m: -1, e: null }, dates = {}, weeks = [], dow = [0,0,0,0,0,0,0], dowN = [0,0,0,0,0,0,0], pt = {};
+    es.forEach(function(e){
+      var m = minutesWorked(e.start, e.end, e.brk); total += m; dates[e.date] = 1;
+      if (m > longest.m) longest = { m: m, e: e };
+      var i = (parseISO(e.date).getDay() + 6) % 7; dow[i] += m; dowN[i]++;
+      partnersOf(e).forEach(function(n){ if (!pt[n]) pt[n] = { m: 0, n: 0 }; pt[n].m += m; pt[n].n++; });
+    });
+    groups.forEach(function(p){ p.wk.forEach(function(w){ weeks.push(w); }); });
+    var busiest = weeks.reduce(function(a, w){ return !a || w.mins > a.mins ? w : a; }, null);
+    var figs = [
+      [hoursStr(total), "Total hours"],
+      [String(es.length), "Shifts"],
+      [String(Object.keys(dates).length), "Days worked"],
+      [hoursStr(total / es.length), "Average shift (hrs)"],
+      [hoursStr(total / weeks.length), "Average per week (hrs)"],
+      [hoursStr(total / groups.length), "Average per biweekly (hrs)"],
+      [hoursStr(longest.m), "Longest shift (hrs), " + shortDate(longest.e.date)],
+      [hoursStr(busiest.mins), "Busiest week (hrs), from " + shortDate(busiest.start)]
+    ];
+    var h = '<div class="figs">' + figs.map(function(f){ return '<div class="fig"><span class="v">' + esc(f[0]) + '</span><span class="l">' + esc(f[1]) + '</span></div>'; }).join("") + '</div>';
+
+    h += bars("Hours per biweekly", groups.map(function(p){ return { l: "#" + periodNo(p.start) + " " + shortDate(periodLabelStart(p.start)), v: p.mins, t: hoursStr(p.mins) }; }));
+    h += bars("Hours per week", weeks.map(function(w){ return { l: shortDate(w.start), v: w.mins, t: hoursStr(w.mins) }; }), "Weeks start on Monday, counted from your biweekly start date.");
+    var names = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+    h += bars("Hours by weekday", names.map(function(n, i){ return { l: n, v: dow[i], t: hoursStr(dow[i]) + " (" + dowN[i] + ")" }; }), "Number of shifts in brackets.");
+    var prow = Object.keys(pt).map(function(n){ return { l: n, v: pt[n].m, t: hoursStr(pt[n].m) + " (" + pt[n].n + ")" }; }).sort(function(a, b){ return b.v - a.v; });
+    h += bars("Hours by partner", prow, "Number of shifts in brackets. A shift with two partners counts for both.");
+    el.innerHTML = h;
+  }
+
+  function renderPreview(){
+    var s = $("start").value, e = $("end").value;
+    $("preview").textContent = (s && e && $("date").value) ? hoursStr(minutesWorked(s, e, $("brk").value)) + " hrs" : "";
+  }
+
+  function renderTabs(){
+    document.querySelectorAll(".tabs button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-tab") === ui.tab); });
+    $("form").hidden = ui.tab !== "notes";
+    $("notesView").hidden = ui.tab !== "notes";
+    $("statsView").hidden = ui.tab !== "stats";
+  }
+
+  function renderAll(){
+    renderHeader(); renderPartners(); renderTabs();
+    $("customWrap").hidden = ui.range !== "custom";
+    if (ui.tab === "notes") renderList(); else renderStats();
+  }
+
+  // editing
+  function resetForm(){
+    ui.editing = null;
+    $("date").value = isoLocal(new Date());
+    $("start").value = ""; $("end").value = ""; $("partner").value = ""; $("brk").value = "0";
+    $("saveBtn").textContent = "Save entry"; $("cancelEdit").hidden = true;
+    renderPreview();
+  }
+  function startEdit(e){
+    ui.editing = e.id;
+    $("date").value = e.date; $("start").value = e.start; $("end").value = e.end;
+    $("partner").value = e.partner; $("brk").value = e.brk || 0;
+    $("saveBtn").textContent = "Update entry"; $("cancelEdit").hidden = false;
+    renderPreview(); $("form").scrollIntoView();
+  }
+
+  // events
+  $("form").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var f = { date: $("date").value, start: $("start").value, end: $("end").value, partner: tidy($("partner").value), brk: Number($("brk").value) || 0 };
+    if (!f.date || !f.start || !f.end || !f.partner) return;
+    if (ui.editing) {
+      state.entries.forEach(function(e){ if (e.id === ui.editing) { e.date = f.date; e.start = f.start; e.end = f.end; e.partner = f.partner; e.brk = f.brk; } });
+      toast("Updated");
+    } else {
+      f.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      state.entries.push(f); toast("Saved");
+    }
+    save(); resetForm(); renderAll();
+  });
+  $("cancelEdit").addEventListener("click", resetForm);
+  ["date", "start", "end", "brk"].forEach(function(id){ $(id).addEventListener("input", renderPreview); });
+
+  document.querySelectorAll(".tabs button").forEach(function(b){
+    b.addEventListener("click", function(){ ui.tab = b.getAttribute("data-tab"); renderAll(); });
+  });
+  $("range").addEventListener("change", function(){ ui.range = this.value; renderAll(); });
+  $("partnerFilter").addEventListener("change", function(){ ui.partner = this.value; renderAll(); });
+  $("from").addEventListener("change", function(){ ui.from = this.value; renderAll(); });
+  $("to").addEventListener("change", function(){ ui.to = this.value; renderAll(); });
+
+  $("dlAll").addEventListener("click", function(){
+    var text = group(filtered()).map(periodText).join("\n\n----------\n\n") + "\n";
+    download("hours-notes-" + isoLocal(new Date()) + ".txt", text);
+  });
+
+  $("anchor").addEventListener("change", function(){ state.anchor = this.value || DEFAULT_ANCHOR; save(); renderAll(); });
+  $("hire").addEventListener("change", function(){ state.hire = this.value || DEFAULT_HIRE; save(); renderAll(); });
+  $("template").addEventListener("input", function(){ state.template = this.value || DEFAULT_TPL; save(); renderAll(); });
+  $("resetTpl").addEventListener("click", function(){ state.template = DEFAULT_TPL; $("template").value = DEFAULT_TPL; save(); renderAll(); });
+
+  $("export").addEventListener("click", function(){
+    download("hours-log-backup-" + isoLocal(new Date()) + ".json", JSON.stringify(state, null, 2), "application/json");
+  });
+  $("importBtn").addEventListener("click", function(){ $("importFile").click(); });
+  $("importFile").addEventListener("change", function(){
+    var f = this.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function(){
+      try {
+        var s = JSON.parse(r.result);
+        if (!Array.isArray(s.entries)) throw 0;
+        if (!confirm("Replace current entries with this backup?")) return;
+        state.entries = s.entries; state.anchor = s.anchor || DEFAULT_ANCHOR; state.hire = s.hire || DEFAULT_HIRE;
+        state.template = s.template || DEFAULT_TPL; state.seeded = true;
+        save(); init(); toast("Restored");
+      } catch(e) { toast("That file is not a valid backup"); }
+    };
+    r.readAsText(f); this.value = "";
+  });
+
+  function init(){
+    $("anchor").value = state.anchor; $("hire").value = state.hire; $("template").value = state.template;
+    $("range").value = ui.range;
+    resetForm(); renderAll();
+  }
+  load(); init();
+})();
+</script>
+</body>
+</html>
