@@ -22,7 +22,7 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--sans);font-variant-numeric:tabular-nums}
 main{max-width:660px;margin:0 auto;padding:48px 20px 96px}
 h1{font:400 clamp(34px,8vw,48px)/1.05 var(--serif);margin:0 0 4px;letter-spacing:-.01em}
-.sub{color:var(--muted);margin:0 0 24px}
+.sub{color:var(--muted);margin:0 0 4px}
 .tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:28px}
 .tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 0;margin-bottom:-1px;color:var(--muted);background:none}
 .tabs button.on{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
@@ -74,12 +74,24 @@ summary{cursor:pointer;color:var(--muted)}
 .toast.show{opacity:1}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.status{color:var(--muted);font-size:14px;margin:0 0 24px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+dialog{width:min(600px,calc(100% - 32px));max-height:80vh;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.hhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+.hhead h3{font:400 24px/1.1 var(--serif);margin:0}
+.ver{border-bottom:1px solid var(--line)}
+.verhead{width:100%;text-align:left;border:0;border-radius:0;padding:12px 0;display:flex;flex-direction:column;gap:2px}
+.verhead small{color:var(--muted);font-size:13px}
+.verbody{padding:0 0 14px}
+.verbody pre{white-space:pre-wrap;font:inherit;margin:0 0 12px;padding:12px;border:1px solid var(--line);border-radius:6px}
+.verbody p{margin:4px 0;font-size:14px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
 <main>
   <h1 id="today"></h1>
   <p class="sub" id="periodNow"></p>
+  <p class="status" id="ghStatus"></p>
 
   <nav class="tabs" aria-label="Views">
     <button type="button" data-tab="notes" class="on">Notes</button>
@@ -151,6 +163,20 @@ summary{cursor:pointer;color:var(--muted)}
     <summary>Settings and backup</summary>
     <div class="settings">
       <div>
+        <label>GitHub sync</label>
+        <div class="row">
+          <div style="flex:1 1 140px"><label for="ghOwner">GitHub username</label><input type="text" id="ghOwner" autocomplete="off" autocapitalize="off"></div>
+          <div style="flex:1 1 140px"><label for="ghRepo">Repository</label><input type="text" id="ghRepo" autocomplete="off" autocapitalize="off"></div>
+        </div>
+        <div style="margin-top:10px"><label for="ghToken">Access token</label><input type="password" id="ghToken" autocomplete="off" placeholder="Paste once on each device"></div>
+        <p class="hint">Make a fine-grained token at github.com/settings/personal-access-tokens/new. Under Repository access choose Only select repositories and pick this repo. Under Repository permissions set Contents to Read and write. The token stays in this browser only. In a public repo, anyone can read your hours.</p>
+        <div class="row" style="margin-top:8px">
+          <button type="button" class="primary" id="ghConnect">Connect and sync</button>
+          <button type="button" id="ghReload">Reload from GitHub</button>
+          <button type="button" id="ghDisconnect">Disconnect this device</button>
+        </div>
+      </div>
+      <div>
         <label for="anchor">A biweekly start date</label>
         <input type="date" id="anchor">
         <p class="hint">Any biweekly start works. Every 14 days after it starts a new one, and weeks run Monday to Sunday from it.</p>
@@ -178,6 +204,7 @@ summary{cursor:pointer;color:var(--muted)}
     </div>
   </details>
 </main>
+<dialog id="hist"><div class="hhead"><h3 id="histTitle"></h3><button type="button" class="link" id="histClose">Close</button></div><div id="histBody"></div></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -231,7 +258,7 @@ summary{cursor:pointer;color:var(--muted)}
         if (old) state.entries = JSON.parse(old).entries || [];
       }
     } catch(e) {}
-    if (!state.seeded) {
+    if (!state.seeded && !ghConnected()) {
       SEED.forEach(function(r){
         var dup = state.entries.some(function(e){ return e.date === r[0] && e.start === r[1]; });
         if (!dup) state.entries.push({ id: "s" + r[0] + r[1].replace(":", ""), date: r[0], start: r[1], end: r[2], brk: 0, partner: r[3] });
@@ -353,9 +380,9 @@ summary{cursor:pointer;color:var(--muted)}
   }
 
   // helpers
-  function toast(msg){
+  function toast(msg, ms){
     var t = $("toast"); t.textContent = msg; t.classList.add("show");
-    clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2200);
+    clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, ms || 2200);
   }
   function copy(text){
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -430,7 +457,7 @@ summary{cursor:pointer;color:var(--muted)}
           acts.appendChild(btn("Copy", "link", function(){ copy(format(e)); }));
           acts.appendChild(btn("Edit", "link", function(){ startEdit(e); }));
           acts.appendChild(btn("Delete", "link danger", function(){
-            if (confirm("Delete this entry?")) { state.entries = state.entries.filter(function(x){ return x.id !== e.id; }); save(); renderAll(); }
+            if (confirm("Delete this entry?")) { state.entries = state.entries.filter(function(x){ return x.id !== e.id; }); persist(); renderAll(); }
           }));
           row.appendChild(t); row.appendChild(acts); wk.appendChild(row);
         });
@@ -450,6 +477,7 @@ summary{cursor:pointer;color:var(--muted)}
       acts2.appendChild(btn("Download .txt", "link", function(){
         download("biweekly-" + periodNo(p.start) + "_" + p.start + "_to_" + addDays(p.start, 13) + ".txt", periodText(p) + "\n");
       }));
+      if (ghConnected()) acts2.appendChild(btn("History", "link", function(){ openHistory(p); }));
       ptot.appendChild(acts2);
       sec.appendChild(ptot);
       list.appendChild(sec);
@@ -512,7 +540,7 @@ summary{cursor:pointer;color:var(--muted)}
   }
 
   function renderAll(){
-    renderHeader(); renderPartners(); renderTabs();
+    renderHeader(); renderPartners(); renderTabs(); setStatus();
     $("customWrap").hidden = ui.range !== "custom";
     if (ui.tab === "notes") renderList(); else renderStats();
   }
@@ -533,6 +561,293 @@ summary{cursor:pointer;color:var(--muted)}
     renderPreview(); $("form").scrollIntoView();
   }
 
+  // GitHub sync
+  var GH_KEY = "hours-log-gh";
+  var gh = { owner: "", repo: "", branch: "", token: "", dirty: false, snapshot: {}, notes: [], lastSync: "" };
+  var ghErr = "", ghBusy = false, ghAgain = false, ghTimer = null, ghLastPull = 0;
+  var RAW = { Accept: "application/vnd.github.raw+json" };
+
+  function loadGh(){
+    try { var r = localStorage.getItem(GH_KEY); if (r) { var o = JSON.parse(r); for (var k in o) gh[k] = o[k]; } } catch(e) {}
+    var host = location.hostname, parts = location.pathname.split("/").filter(Boolean);
+    if (!gh.owner && /\.github\.io$/.test(host)) { gh.owner = host.split(".")[0]; gh.repo = parts[0] || host; }
+  }
+  function saveGh(){ try { localStorage.setItem(GH_KEY, JSON.stringify(gh)); } catch(e) {} }
+  function ghConnected(){ return !!(gh.owner && gh.repo && gh.token); }
+  function errMsg(err){
+    if (err instanceof TypeError) return "No connection. Your changes are kept on this device.";
+    return (err && err.message) || "Something went wrong.";
+  }
+  function ghApi(path, o){
+    o = o || {};
+    var h = { Accept: "application/vnd.github+json", Authorization: "Bearer " + gh.token };
+    if (o.headers) for (var k in o.headers) h[k] = o.headers[k];
+    if (o.body) h["Content-Type"] = "application/json";
+    return fetch("https://api.github.com/repos/" + gh.owner + "/" + gh.repo + path, {
+      method: o.method || "GET", headers: h, body: o.body ? JSON.stringify(o.body) : undefined, cache: "no-store"
+    }).then(function(r){
+      if (r.ok) return o.text ? r.text() : r.json();
+      return r.text().then(function(t){
+        var m = ""; try { m = JSON.parse(t).message; } catch(e) {}
+        var msg;
+        if (r.status === 401) msg = "GitHub did not accept the token. Make a new one.";
+        else if (r.status === 403 || (r.status === 404 && o.method)) msg = "GitHub refused the request" + (m ? " (" + m + ")" : "") + ". Check the token has Contents: Read and write for this repo.";
+        else if (r.status === 404) msg = "Repository or branch not found. Check the username and repository name.";
+        else msg = "GitHub error " + r.status + (m ? ": " + m : "");
+        var err = new Error(msg); err.status = r.status; throw err;
+      });
+    });
+  }
+
+  function cleanEntry(e){ return { id: e.id, date: e.date, start: e.start, end: e.end, partner: e.partner, brk: e.brk || 0 }; }
+  function sig(e){ return [e.date, e.start, e.end, e.partner, e.brk || 0].join("|"); }
+  function brief(e){ return shortDate(e.date) + ", " + time12(e.start) + " to " + time12(e.end) + ", with " + e.partner; }
+
+  function buildFiles(){
+    var files = {}, notes = {};
+    group(state.entries.slice().sort(sortAsc)).forEach(function(p){
+      var items = []; p.wk.forEach(function(w){ w.items.forEach(function(e){ items.push(cleanEntry(e)); }); });
+      files["data/" + p.start + ".json"] = JSON.stringify({ biweekly: periodNo(p.start), start: p.start, end: addDays(p.start, 13), entries: items }, null, 2) + "\n";
+      notes["notes/" + p.start + "_biweekly-" + periodNo(p.start) + ".txt"] = periodText(p) + "\n";
+    });
+    files["data/settings.json"] = JSON.stringify({ anchor: state.anchor, hire: state.hire, template: state.template }, null, 2) + "\n";
+    return { files: files, notes: notes };
+  }
+  function snapEntries(){
+    var out = [];
+    Object.keys(gh.snapshot).forEach(function(p){
+      if (p === "data/settings.json") return;
+      try { (JSON.parse(gh.snapshot[p]).entries || []).forEach(function(e){ out.push(e); }); } catch(x) {}
+    });
+    return out;
+  }
+  function diffEntries(oldE, newE){
+    var om = {}, nm = {}, add = [], edit = [], del = [];
+    oldE.forEach(function(e){ om[e.id] = e; }); newE.forEach(function(e){ nm[e.id] = e; });
+    newE.forEach(function(e){ if (!om[e.id]) add.push(e); else if (sig(om[e.id]) !== sig(e)) edit.push({ from: om[e.id], to: e }); });
+    oldE.forEach(function(e){ if (!nm[e.id]) del.push(e); });
+    return { add: add, edit: edit, del: del };
+  }
+  function commitMessage(settingsChanged){
+    if (!Object.keys(gh.snapshot).length) {
+      return "Initial import: " + state.entries.length + " shifts across " + group(state.entries).length + " biweeklies";
+    }
+    var d = diffEntries(snapEntries(), state.entries), by = {}, order = [];
+    function slot(e){ var k = periodStart(e.date); if (!by[k]) { by[k] = { add: [], edit: [], del: [] }; order.push(k); } return by[k]; }
+    d.add.forEach(function(e){ slot(e).add.push(e); });
+    d.edit.forEach(function(x){ slot(x.to).edit.push(x); });
+    d.del.forEach(function(e){ slot(e).del.push(e); });
+    order.sort();
+    var heads = [], body = [];
+    order.forEach(function(k){
+      var sl = by[k], bits = [];
+      if (sl.add.length) bits.push("added " + sl.add.map(function(e){ return shortDate(e.date); }).join(", "));
+      if (sl.edit.length) bits.push("edited " + sl.edit.map(function(x){ return shortDate(x.to.date); }).join(", "));
+      if (sl.del.length) bits.push("deleted " + sl.del.map(function(e){ return shortDate(e.date); }).join(", "));
+      heads.push("Biweekly " + periodNo(k) + ": " + bits.join(", "));
+      sl.add.forEach(function(e){ body.push("+ " + brief(e)); });
+      sl.edit.forEach(function(x){ body.push("~ " + brief(x.from) + "  ->  " + brief(x.to)); });
+      sl.del.forEach(function(e){ body.push("- " + brief(e)); });
+    });
+    var title = heads.join("; ") || "Update settings";
+    if (heads.length && settingsChanged) title += "; settings";
+    return body.length ? title + "\n\n" + body.join("\n") : title;
+  }
+
+  function setStatus(){
+    var el = $("ghStatus"); if (!el) return;
+    el.textContent = "";
+    var span = document.createElement("span");
+    if (!ghConnected()) span.textContent = "Saved on this device only.";
+    else if (ghBusy) span.textContent = "Syncing with GitHub…";
+    else if (ghErr) span.textContent = "Not saved to GitHub: " + ghErr;
+    else if (gh.dirty) span.textContent = "Changes waiting to save to GitHub.";
+    else span.textContent = gh.lastSync ? "In sync with GitHub, " + new Date(gh.lastSync).toLocaleString("en-CA", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Connected to GitHub.";
+    el.appendChild(span);
+    if (!ghConnected()) el.appendChild(btn("Connect GitHub", "link", openSettings));
+    else if (!ghBusy && (ghErr || gh.dirty)) el.appendChild(btn("Retry", "link", function(){ ghSave(); }));
+  }
+  function openSettings(){ var d = document.querySelector("details"); d.open = true; d.scrollIntoView(); }
+
+  function persist(){ save(); queueSave(); }
+  function queueSave(){
+    if (!ghConnected()) { setStatus(); return; }
+    gh.dirty = true; saveGh(); setStatus();
+    clearTimeout(ghTimer); ghTimer = setTimeout(ghSave, 1200);
+  }
+
+  function ghSave(){
+    if (!ghConnected()) { setStatus(); return Promise.resolve(); }
+    if (ghBusy) { ghAgain = true; return Promise.resolve(); }
+    var built = buildFiles(), br = gh.branch || "main", writes = [], deletes = [];
+    Object.keys(built.files).forEach(function(pth){ if (gh.snapshot[pth] !== built.files[pth]) writes.push({ path: pth, text: built.files[pth] }); });
+    Object.keys(gh.snapshot).forEach(function(pth){ if (!(pth in built.files)) deletes.push(pth); });
+    Object.keys(built.notes).forEach(function(np){
+      var start = np.split("/")[1].split("_")[0], dataPath = "data/" + start + ".json";
+      var changed = writes.some(function(w){ return w.path === dataPath; });
+      if (changed || gh.notes.indexOf(np) < 0) writes.push({ path: np, text: built.notes[np] });
+      gh.notes.forEach(function(o){ if (o.indexOf("notes/" + start + "_") === 0 && o !== np && deletes.indexOf(o) < 0) deletes.push(o); });
+    });
+    deletes.slice().forEach(function(pth){
+      var m = pth.match(/^data\/(\d{4}-\d{2}-\d{2})\.json$/);
+      if (m) gh.notes.forEach(function(o){ if (o.indexOf("notes/" + m[1] + "_") === 0 && deletes.indexOf(o) < 0) deletes.push(o); });
+    });
+    if (!writes.length && !deletes.length) { gh.dirty = false; ghErr = ""; saveGh(); setStatus(); return Promise.resolve(); }
+
+    var msg = commitMessage(writes.some(function(w){ return w.path === "data/settings.json"; }));
+    ghBusy = true; ghErr = ""; setStatus();
+
+    function run(){
+      var head, base;
+      return ghApi("/git/ref/heads/" + br).then(function(r){ head = r.object.sha; return ghApi("/git/commits/" + head); })
+        .then(function(c){
+          base = c.tree.sha;
+          return Promise.all(writes.map(function(w){
+            return ghApi("/git/blobs", { method: "POST", body: { content: w.text, encoding: "utf-8" } })
+              .then(function(b){ return { path: w.path, mode: "100644", type: "blob", sha: b.sha }; });
+          }));
+        })
+        .then(function(items){
+          deletes.forEach(function(pth){ items.push({ path: pth, mode: "100644", type: "blob", sha: null }); });
+          return ghApi("/git/trees", { method: "POST", body: { base_tree: base, tree: items } });
+        })
+        .then(function(t){ return ghApi("/git/commits", { method: "POST", body: { message: msg, tree: t.sha, parents: [head] } }); })
+        .then(function(c){ return ghApi("/git/refs/heads/" + br, { method: "PATCH", body: { sha: c.sha } }); });
+    }
+    return run().catch(function(err){ if (err.status === 422 || err.status === 409) return run(); throw err; })
+      .then(function(){
+        writes.forEach(function(w){
+          if (/^data\//.test(w.path)) gh.snapshot[w.path] = w.text;
+          else if (gh.notes.indexOf(w.path) < 0) gh.notes.push(w.path);
+        });
+        deletes.forEach(function(pth){ delete gh.snapshot[pth]; var i = gh.notes.indexOf(pth); if (i >= 0) gh.notes.splice(i, 1); });
+        gh.dirty = false; gh.lastSync = new Date().toISOString(); ghErr = "";
+      }, function(err){ ghErr = errMsg(err); })
+      .then(function(){ ghBusy = false; saveGh(); setStatus(); if (ghAgain) { ghAgain = false; ghSave(); } });
+  }
+
+  function ghPull(){
+    var br = gh.branch || "main";
+    return ghApi("/git/trees/" + br + "?recursive=1").then(function(t){
+      var tree = t.tree || [];
+      gh.notes = tree.filter(function(x){ return /^notes\//.test(x.path); }).map(function(x){ return x.path; });
+      var files = tree.filter(function(x){ return x.type === "blob" && /^data\/[^\/]+\.json$/.test(x.path); });
+      return Promise.all(files.map(function(f){
+        return ghApi("/contents/" + f.path + "?ref=" + br, { headers: RAW, text: true }).then(function(txt){ return { path: f.path, text: txt }; });
+      }));
+    }, function(err){ if (err.status === 409) return []; throw err; });
+  }
+  function applyRemote(res, mode){
+    var rem = {}, snap = {}, settings = null;
+    res.forEach(function(r){
+      snap[r.path] = r.text;
+      try {
+        var o = JSON.parse(r.text);
+        if (r.path === "data/settings.json") settings = o;
+        else (o.entries || []).forEach(function(e){ rem[e.id] = e; });
+      } catch(e) {}
+    });
+    if (!res.length) {
+      gh.snapshot = {}; saveGh();
+      if (state.entries.length && confirm("Nothing is on GitHub yet. Upload your " + state.entries.length + " shifts as the first version?")) persist();
+      return;
+    }
+    var localOnly = state.entries.filter(function(e){ return !rem[e.id] && !/^s\d{4}-\d{2}-\d{2}/.test(e.id); });
+    var keep = [];
+    if (mode === "connect" && localOnly.length && confirm(localOnly.length + " shift(s) on this device are not on GitHub yet. Add them? Cancel discards them.")) keep = localOnly;
+    state.entries = Object.keys(rem).map(function(k){ return rem[k]; }).concat(keep);
+    if (settings) { state.anchor = settings.anchor || state.anchor; state.hire = settings.hire || state.hire; state.template = settings.template || state.template; }
+    state.seeded = true; gh.snapshot = snap; gh.dirty = false;
+    save(); saveGh();
+    $("anchor").value = state.anchor; $("hire").value = state.hire; $("template").value = state.template;
+    if (keep.length) queueSave();
+  }
+  function ghSync(mode){
+    ghBusy = true; ghErr = ""; setStatus();
+    return ghPull().then(function(res){
+      applyRemote(res, mode); gh.lastSync = new Date().toISOString(); ghLastPull = Date.now();
+    }, function(err){ ghErr = errMsg(err); })
+      .then(function(){ ghBusy = false; saveGh(); renderAll(); });
+  }
+  function ghStart(){
+    if (!ghConnected()) return;
+    if (gh.dirty) ghSave(); else ghSync("sync");
+  }
+
+  // version history
+  function openHistory(p){
+    var dlg = $("hist"), body = $("histBody"), pth = "data/" + p.start + ".json", br = gh.branch || "main";
+    $("histTitle").textContent = periodTitle(p) + ": versions";
+    body.innerHTML = '<p class="hint">Loading…</p>';
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+    ghApi("/commits?path=" + encodeURIComponent(pth) + "&sha=" + br + "&per_page=50").then(function(list){
+      if (!list.length) { body.innerHTML = '<p class="hint">No saved versions yet. Once you add or change a shift, versions appear here.</p>'; return; }
+      body.innerHTML = "";
+      list.forEach(function(c, i){
+        var row = document.createElement("div"); row.className = "ver";
+        var head = document.createElement("button"); head.type = "button"; head.className = "verhead";
+        head.innerHTML = "<span></span><small></small>";
+        head.children[0].textContent = c.commit.message.split("\n")[0];
+        head.children[1].textContent = new Date(c.commit.author.date).toLocaleString("en-CA", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) + (i === 0 ? " (latest)" : "");
+        var detail = document.createElement("div"); detail.className = "verbody"; detail.hidden = true;
+        head.onclick = function(){
+          if (!detail.hidden) { detail.hidden = true; return; }
+          detail.hidden = false;
+          if (!detail.getAttribute("data-done")) { detail.setAttribute("data-done", "1"); showVersion(c, p, pth, detail); }
+        };
+        row.appendChild(head); row.appendChild(detail); body.appendChild(row);
+      });
+    }, function(err){ body.innerHTML = ""; var m = document.createElement("p"); m.className = "hint"; m.textContent = errMsg(err); body.appendChild(m); });
+  }
+  function showVersion(c, p, pth, detail){
+    detail.textContent = "Loading…";
+    ghApi("/contents/" + pth + "?ref=" + c.sha, { headers: RAW, text: true }).then(function(txt){
+      var vers = (JSON.parse(txt).entries || []).slice().sort(sortAsc);
+      var cur = state.entries.filter(function(e){ return periodStart(e.date) === p.start; });
+      var d = diffEntries(vers, cur), g = group(vers)[0];
+      detail.innerHTML = "";
+      var pre = document.createElement("pre"); pre.textContent = g ? periodText(g) : "(no shifts in this version)"; detail.appendChild(pre);
+      function line(t){ var q = document.createElement("p"); q.textContent = t; detail.appendChild(q); }
+      d.add.forEach(function(e){ line("Added since: " + brief(e)); });
+      d.edit.forEach(function(x){ line("Edited since: " + brief(x.from) + "  ->  " + brief(x.to)); });
+      d.del.forEach(function(e){ line("Deleted since: " + brief(e)); });
+      if (!d.add.length && !d.edit.length && !d.del.length) { line("Same as the current version."); return; }
+      var rb = btn("Restore this version", "primary", function(){
+        if (!confirm("Restore this version? The restore is saved as a new version, so nothing is lost.")) return;
+        state.entries = state.entries.filter(function(e){ return periodStart(e.date) !== p.start; }).concat(vers);
+        persist(); closeHist(); renderAll(); toast("Restored");
+      });
+      rb.style.marginTop = "10px"; detail.appendChild(rb);
+    }, function(err){ detail.textContent = errMsg(err); });
+  }
+  function closeHist(){ var d = $("hist"); if (d.close) d.close(); else d.removeAttribute("open"); }
+
+  $("histClose").addEventListener("click", closeHist);
+  $("ghConnect").addEventListener("click", function(){
+    gh.owner = $("ghOwner").value.trim(); gh.repo = $("ghRepo").value.trim();
+    var t = $("ghToken").value.trim(); if (t) gh.token = t;
+    if (!gh.owner || !gh.repo || !gh.token) { toast("Fill in username, repository and token"); return; }
+    ghBusy = true; ghErr = ""; setStatus();
+    ghApi("").then(function(info){
+      gh.branch = info.default_branch || "main"; gh.snapshot = {}; gh.notes = []; saveGh();
+      return ghPull();
+    }).then(function(res){
+      applyRemote(res, "connect"); gh.lastSync = new Date().toISOString(); ghLastPull = Date.now();
+      $("ghToken").value = ""; toast("Connected to GitHub");
+    }, function(err){ gh.token = ""; toast(errMsg(err), 5000); })
+      .then(function(){ ghBusy = false; saveGh(); renderAll(); });
+  });
+  $("ghReload").addEventListener("click", function(){
+    if (!ghConnected()) { toast("Connect GitHub first"); return; }
+    if (confirm("Replace this device's hours with what is on GitHub?")) ghSync("force");
+  });
+  $("ghDisconnect").addEventListener("click", function(){
+    gh.token = ""; gh.dirty = false; gh.snapshot = {}; gh.notes = []; ghErr = ""; saveGh(); renderAll(); toast("Disconnected on this device");
+  });
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible" && ghConnected() && !gh.dirty && !ghBusy && Date.now() - ghLastPull > 60000) ghSync("sync");
+  });
+
   // events
   $("form").addEventListener("submit", function(ev){
     ev.preventDefault();
@@ -545,7 +860,7 @@ summary{cursor:pointer;color:var(--muted)}
       f.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       state.entries.push(f); toast("Saved");
     }
-    save(); resetForm(); renderAll();
+    persist(); resetForm(); renderAll();
   });
   $("cancelEdit").addEventListener("click", resetForm);
   ["date", "start", "end", "brk"].forEach(function(id){ $(id).addEventListener("input", renderPreview); });
@@ -563,10 +878,10 @@ summary{cursor:pointer;color:var(--muted)}
     download("hours-notes-" + isoLocal(new Date()) + ".txt", text);
   });
 
-  $("anchor").addEventListener("change", function(){ state.anchor = this.value || DEFAULT_ANCHOR; save(); renderAll(); });
-  $("hire").addEventListener("change", function(){ state.hire = this.value || DEFAULT_HIRE; save(); renderAll(); });
-  $("template").addEventListener("input", function(){ state.template = this.value || DEFAULT_TPL; save(); renderAll(); });
-  $("resetTpl").addEventListener("click", function(){ state.template = DEFAULT_TPL; $("template").value = DEFAULT_TPL; save(); renderAll(); });
+  $("anchor").addEventListener("change", function(){ state.anchor = this.value || DEFAULT_ANCHOR; persist(); renderAll(); });
+  $("hire").addEventListener("change", function(){ state.hire = this.value || DEFAULT_HIRE; persist(); renderAll(); });
+  $("template").addEventListener("input", function(){ state.template = this.value || DEFAULT_TPL; persist(); renderAll(); });
+  $("resetTpl").addEventListener("click", function(){ state.template = DEFAULT_TPL; $("template").value = DEFAULT_TPL; persist(); renderAll(); });
 
   $("export").addEventListener("click", function(){
     download("hours-log-backup-" + isoLocal(new Date()) + ".json", JSON.stringify(state, null, 2), "application/json");
@@ -582,7 +897,7 @@ summary{cursor:pointer;color:var(--muted)}
         if (!confirm("Replace current entries with this backup?")) return;
         state.entries = s.entries; state.anchor = s.anchor || DEFAULT_ANCHOR; state.hire = s.hire || DEFAULT_HIRE;
         state.template = s.template || DEFAULT_TPL; state.seeded = true;
-        save(); init(); toast("Restored");
+        persist(); init(); toast("Restored");
       } catch(e) { toast("That file is not a valid backup"); }
     };
     r.readAsText(f); this.value = "";
@@ -590,10 +905,11 @@ summary{cursor:pointer;color:var(--muted)}
 
   function init(){
     $("anchor").value = state.anchor; $("hire").value = state.hire; $("template").value = state.template;
+    $("ghOwner").value = gh.owner; $("ghRepo").value = gh.repo;
     $("range").value = ui.range;
     resetForm(); renderAll();
   }
-  load(); init();
+  loadGh(); load(); init(); ghStart();
 })();
 </script>
 </body>
