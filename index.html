@@ -350,7 +350,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     entries.forEach(function(e){
       var ps = periodStart(e.date), ws = weekStart(e.date), m = minutesWorked(e.start, e.end, e.brk);
       var p = map[ps]; if (!p) { p = map[ps] = { start: ps, wkMap: {}, wk: [], mins: 0, n: 0 }; out.push(p); }
-      var w = p.wkMap[ws]; if (!w) { w = p.wkMap[ws] = { start: ws, items: [], mins: 0 }; p.wk.push(w); }
+      var w = p.wkMap[ws]; if (!w) { var ls = periodLabelStart(ps), pe = addDays(ps, 13), we = addDays(ws, 6); w = p.wkMap[ws] = { start: ws, from: ws < ls ? ls : ws, to: we > pe ? pe : we, items: [], mins: 0 }; p.wk.push(w); }
       w.items.push(e); w.mins += m; p.mins += m; p.n++;
     });
     out.sort(function(a, b){ return a.start < b.start ? -1 : 1; });
@@ -448,7 +448,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       p.wk.forEach(function(w){
         var wk = document.createElement("div"); wk.className = "week";
         var wh = document.createElement("div"); wh.className = "whead";
-        wh.textContent = "Week of " + shortDate(w.start) + " to " + shortDate(addDays(w.start, 6));
+        wh.textContent = "Week of " + shortDate(w.from) + " to " + shortDate(w.to);
         wk.appendChild(wh);
         w.items.forEach(function(e){
           var row = document.createElement("div"); row.className = "entry";
@@ -475,7 +475,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       var acts2 = document.createElement("span");
       acts2.appendChild(btn("Copy", "link", function(){ copy(periodText(p)); }));
       acts2.appendChild(btn("Download .txt", "link", function(){
-        download("biweekly-" + periodNo(p.start) + "_" + p.start + "_to_" + addDays(p.start, 13) + ".txt", periodText(p) + "\n");
+        download("biweekly-" + periodNo(p.start) + "_" + periodLabelStart(p.start) + "_to_" + addDays(p.start, 13) + ".txt", periodText(p) + "\n");
       }));
       if (ghConnected()) acts2.appendChild(btn("History", "link", function(){ openHistory(p); }));
       ptot.appendChild(acts2);
@@ -514,12 +514,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       [hoursStr(total / weeks.length), "Average per week (hrs)"],
       [hoursStr(total / groups.length), "Average per biweekly (hrs)"],
       [hoursStr(longest.m), "Longest shift (hrs), " + shortDate(longest.e.date)],
-      [hoursStr(busiest.mins), "Busiest week (hrs), from " + shortDate(busiest.start)]
+      [hoursStr(busiest.mins), "Busiest week (hrs), from " + shortDate(busiest.from)]
     ];
     var h = '<div class="figs">' + figs.map(function(f){ return '<div class="fig"><span class="v">' + esc(f[0]) + '</span><span class="l">' + esc(f[1]) + '</span></div>'; }).join("") + '</div>';
 
     h += bars("Hours per biweekly", groups.map(function(p){ return { l: "#" + periodNo(p.start) + " " + shortDate(periodLabelStart(p.start)), v: p.mins, t: hoursStr(p.mins) }; }));
-    h += bars("Hours per week", weeks.map(function(w){ return { l: shortDate(w.start), v: w.mins, t: hoursStr(w.mins) }; }), "Weeks start on Monday, counted from your biweekly start date.");
+    h += bars("Hours per week", weeks.map(function(w){ return { l: shortDate(w.from), v: w.mins, t: hoursStr(w.mins) }; }), "Weeks run Monday to Sunday. The first week starts on your first day of work.");
     var names = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
     h += bars("Hours by weekday", names.map(function(n, i){ return { l: n, v: dow[i], t: hoursStr(dow[i]) + " (" + dowN[i] + ")" }; }), "Number of shifts in brackets.");
     var prow = Object.keys(pt).map(function(n){ return { l: n, v: pt[n].m, t: hoursStr(pt[n].m) + " (" + pt[n].n + ")" }; }).sort(function(a, b){ return b.v - a.v; });
@@ -607,8 +607,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     var files = {}, notes = {};
     group(state.entries.slice().sort(sortAsc)).forEach(function(p){
       var items = []; p.wk.forEach(function(w){ w.items.forEach(function(e){ items.push(cleanEntry(e)); }); });
-      files["data/" + p.start + ".json"] = JSON.stringify({ biweekly: periodNo(p.start), start: p.start, end: addDays(p.start, 13), entries: items }, null, 2) + "\n";
-      notes["notes/" + p.start + "_biweekly-" + periodNo(p.start) + ".txt"] = periodText(p) + "\n";
+      var ls = periodLabelStart(p.start);
+      files["data/" + ls + ".json"] = JSON.stringify({ biweekly: periodNo(p.start), start: ls, end: addDays(p.start, 13), entries: items }, null, 2) + "\n";
+      notes["notes/" + ls + "_biweekly-" + periodNo(p.start) + ".txt"] = periodText(p) + "\n";
     });
     files["data/settings.json"] = JSON.stringify({ anchor: state.anchor, hire: state.hire, template: state.template }, null, 2) + "\n";
     return { files: files, notes: notes };
@@ -776,7 +777,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
   // version history
   function openHistory(p){
-    var dlg = $("hist"), body = $("histBody"), pth = "data/" + p.start + ".json", br = gh.branch || "main";
+    var dlg = $("hist"), body = $("histBody"), pth = "data/" + periodLabelStart(p.start) + ".json", br = gh.branch || "main";
     $("histTitle").textContent = periodTitle(p) + ": versions";
     body.innerHTML = '<p class="hint">Loading…</p>';
     if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
